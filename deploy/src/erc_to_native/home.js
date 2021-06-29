@@ -153,10 +153,12 @@ async function initializeBridge({ validatorsBridge, bridge, initialNonce }) {
 
 async function deployHome() {
   let nonce = await web3Home.eth.getTransactionCount(DEPLOYMENT_ACCOUNT_ADDRESS)
-  console.log('deploying storage for home validators')
+  let chainId = await await web3Home.eth.getChainId();
+  console.log('deploying storage for home validators', await web3Home.eth.getChainId())
   const storageValidatorsHome = await deployContract(EternalStorageProxy, [], {
     from: DEPLOYMENT_ACCOUNT_ADDRESS,
-    nonce
+    nonce,
+    chainId
   })
   console.log('[Home] BridgeValidators Storage: ', storageValidatorsHome.options.address)
   nonce++
@@ -165,7 +167,8 @@ async function deployHome() {
   const bridgeValidatorsContract = isRewardableBridge && !isFeeManagerPOSDAO ? RewardableValidators : BridgeValidators
   const bridgeValidatorsHome = await deployContract(bridgeValidatorsContract, [], {
     from: DEPLOYMENT_ACCOUNT_ADDRESS,
-    nonce
+    nonce,
+    chainId: 55
   })
   console.log('[Home] BridgeValidators Implementation: ', bridgeValidatorsHome.options.address)
   nonce++
@@ -176,6 +179,7 @@ async function deployHome() {
     implementationAddress: bridgeValidatorsHome.options.address,
     version: '1',
     nonce,
+    chainId: 55,
     url: HOME_RPC_URL
   })
   nonce++
@@ -190,6 +194,7 @@ async function deployHome() {
     rewardAccounts: VALIDATORS_REWARD_ACCOUNTS,
     owner: HOME_VALIDATORS_OWNER,
     nonce,
+    chainId: 55,
     url: HOME_RPC_URL
   })
   nonce++
@@ -199,6 +204,7 @@ async function deployHome() {
     proxy: storageValidatorsHome,
     newOwner: HOME_UPGRADEABLE_ADMIN,
     nonce,
+    chainId: 55,
     url: HOME_RPC_URL
   })
   nonce++
@@ -206,7 +212,8 @@ async function deployHome() {
   console.log('\ndeploying homeBridge storage\n')
   const homeBridgeStorage = await deployContract(EternalStorageProxy, [], {
     from: DEPLOYMENT_ACCOUNT_ADDRESS,
-    nonce
+    nonce,
+    chainId: 55
   })
   nonce++
   console.log('[Home] HomeBridge Storage: ', homeBridgeStorage.options.address)
@@ -214,7 +221,8 @@ async function deployHome() {
   console.log('\ndeploying homeBridge implementation\n')
   const homeBridgeImplementation = await deployContract(HomeBridge, [], {
     from: DEPLOYMENT_ACCOUNT_ADDRESS,
-    nonce
+    nonce,
+    chainId: 55
   })
   nonce++
   console.log('[Home] HomeBridge Implementation: ', homeBridgeImplementation.options.address)
@@ -225,7 +233,8 @@ async function deployHome() {
     implementationAddress: homeBridgeImplementation.options.address,
     version: '1',
     nonce,
-    url: HOME_RPC_URL
+    url: HOME_RPC_URL,
+    chainId: 55
   })
   nonce++
 
@@ -233,6 +242,7 @@ async function deployHome() {
   nonce = await initializeBridge({
     validatorsBridge: storageValidatorsHome,
     bridge: homeBridgeImplementation,
+    chainId: 55,
     initialNonce: nonce
   })
 
@@ -241,6 +251,7 @@ async function deployHome() {
     proxy: homeBridgeStorage,
     newOwner: HOME_UPGRADEABLE_ADMIN,
     nonce,
+    chainId: 55,
     url: HOME_RPC_URL
   })
 

@@ -23,7 +23,7 @@ const {
 } = require('./web3')
 const verifier = require('./utils/verifier')
 
-async function deployContract(contractJson, args, { from, network, nonce }) {
+async function deployContract(contractJson, args, { from, network, nonce, chainId }) {
   let web3
   let url
   let gasPrice
@@ -52,27 +52,34 @@ async function deployContract(contractJson, args, { from, network, nonce }) {
       arguments: args
     })
     .encodeABI()
+  console.log(1, chainId)
   const tx = await sendRawTx({
     data: result,
     nonce: Web3Utils.toHex(nonce),
     to: null,
     privateKey: deploymentPrivateKey,
     url,
-    gasPrice
+    gasPrice,
+    chainId: chainId
   })
   if (Web3Utils.hexToNumber(tx.status) !== 1 && !tx.contractAddress) {
     throw new Error('Tx failed')
   }
   instance.options.address = tx.contractAddress
   instance.deployedBlockNumber = tx.blockNumber
+  console.log('here', instance)
+  // if (apiUrl) {
+  //   console.log('here2', apiUrl)
+  //   let constructorArguments
+  //   if (args.length) {
+  //     constructorArguments = result.substring(contractJson.bytecode.length)
+  //   }
+  //   console.log('here3', constructorArguments)
 
-  if (apiUrl) {
-    let constructorArguments
-    if (args.length) {
-      constructorArguments = result.substring(contractJson.bytecode.length)
-    }
-    await verifier({ artifact: contractJson, constructorArguments, address: tx.contractAddress, apiUrl, apiKey })
-  }
+  //   await verifier({ artifact: contractJson, constructorArguments, address: tx.contractAddress, apiUrl, apiKey })
+  // }
+
+  console.log('here4', instance)
 
   return instance
 }
@@ -80,6 +87,7 @@ async function deployContract(contractJson, args, { from, network, nonce }) {
 async function sendRawTxHome(options) {
   return sendRawTx({
     ...options,
+    chainId: 55,
     gasPrice: HOME_DEPLOYMENT_GAS_PRICE
   })
 }
@@ -87,41 +95,44 @@ async function sendRawTxHome(options) {
 async function sendRawTxForeign(options) {
   return sendRawTx({
     ...options,
+    chainId: 3,
     gasPrice: FOREIGN_DEPLOYMENT_GAS_PRICE
   })
 }
 
-async function sendRawTx({ data, nonce, to, privateKey, url, gasPrice, value }) {
+async function sendRawTx({ data, nonce, to, privateKey, url, gasPrice, value, chainId }) {
   try {
-    const txToEstimateGas = {
-      from: privateKeyToAddress(Web3Utils.bytesToHex(privateKey)),
-      value,
-      to,
-      data
-    }
-    const estimatedGas = BigNumber(await sendNodeRequest(url, 'eth_estimateGas', txToEstimateGas))
-
+    
+    // const txToEstimateGas = {
+    //   from: privateKeyToAddress(Web3Utils.bytesToHex(privateKey)),
+    //   value,
+    //   to,
+    //   data
+    // }
+    // const estimatedGas = BigNumber(await sendNodeRequest(url, 'eth_estimateGas', txToEstimateGas))
+    // console.log('111111111111111111 chainId', chainId)
     const blockData = await sendNodeRequest(url, 'eth_getBlockByNumber', ['latest', false])
     const blockGasLimit = BigNumber(blockData.gasLimit)
-    if (estimatedGas.isGreaterThan(blockGasLimit)) {
-      throw new Error(
-        `estimated gas greater (${estimatedGas.toString()}) than the block gas limit (${blockGasLimit.toString()})`
-      )
-    }
-    let gas = estimatedGas.multipliedBy(BigNumber(1 + GAS_LIMIT_EXTRA))
-    if (gas.isGreaterThan(blockGasLimit)) {
-      gas = blockGasLimit
-    } else {
-      gas = gas.toFixed(0)
-    }
+    // if (estimatedGas.isGreaterThan(blockGasLimit)) {
+    //   throw new Error(
+    //     `estimated gas greater (${estimatedGas.toString()}) than the block gas limit (${blockGasLimit.toString()})`
+    //   )
+    // }
+    // let gas = estimatedGas.multipliedBy(BigNumber(1 + GAS_LIMIT_EXTRA))
+    // if (gas.isGreaterThan(blockGasLimit)) {
+    //   gas = blockGasLimit
+    // } else {
+    //   gas = gas.toFixed(0)
+    // }
 
     const rawTx = {
       nonce,
       gasPrice: Web3Utils.toHex(gasPrice),
-      gasLimit: Web3Utils.toHex(gas),
+      gasLimit: Web3Utils.toHex(blockGasLimit),
       to,
       data,
-      value
+      value,
+      chainId: chainId
     }
 
     const tx = new Tx(rawTx)
@@ -166,8 +177,11 @@ function timeout(ms) {
 }
 
 async function getReceipt(txHash, url) {
+  console.log('In getReceipt', txHash)
   await timeout(GET_RECEIPT_INTERVAL_IN_MILLISECONDS)
+  
   let receipt = await sendNodeRequest(url, 'eth_getTransactionReceipt', txHash)
+  console.log('result getReceipt', receipt)
   if (receipt === null || receipt.blockNumber === null) {
     receipt = await getReceipt(txHash, url)
   }
@@ -193,7 +207,7 @@ function logValidatorsAndRewardAccounts(validators, rewards) {
   })
 }
 
-async function upgradeProxy({ proxy, implementationAddress, version, nonce, url }) {
+async function upgradeProxy({ proxy, implementationAddress, version, nonce, url, chainId }) {
   const data = await proxy.methods.upgradeTo(version, implementationAddress).encodeABI()
   const sendTx = getSendTxMethod(url)
   const result = await sendTx({
@@ -201,8 +215,10 @@ async function upgradeProxy({ proxy, implementationAddress, version, nonce, url 
     nonce,
     to: proxy.options.address,
     privateKey: deploymentPrivateKey,
-    url
+    url,
+    chainId
   })
+  console.log(55, result.status)
   if (result.status) {
     assert.strictEqual(Web3Utils.hexToNumber(result.status), 1, 'Transaction Failed')
   } else {
@@ -210,12 +226,13 @@ async function upgradeProxy({ proxy, implementationAddress, version, nonce, url 
   }
 }
 
-async function transferProxyOwnership({ proxy, newOwner, nonce, url }) {
+async function transferProxyOwnership({ proxy, newOwner, nonce, url, chainId }) {
   const data = await proxy.methods.transferProxyOwnership(newOwner).encodeABI()
   const sendTx = getSendTxMethod(url)
   const result = await sendTx({
     data,
     nonce,
+    chainId,
     to: proxy.options.address,
     privateKey: deploymentPrivateKey,
     url
@@ -269,10 +286,10 @@ async function initializeValidators({
   rewardAccounts,
   owner,
   nonce,
-  url
+  url,
+  chainId
 }) {
   let data
-
   if (isRewardableBridge) {
     console.log(`REQUIRED_NUMBER_OF_VALIDATORS: ${requiredNumber}, VALIDATORS_OWNER: ${owner}`)
     logValidatorsAndRewardAccounts(validators, rewardAccounts)
@@ -283,14 +300,17 @@ async function initializeValidators({
     )
     data = await contract.methods.initialize(requiredNumber, validators, owner).encodeABI()
   }
+  console.log('1,', chainId)
   const sendTx = getSendTxMethod(url)
   const result = await sendTx({
     data,
     nonce,
     to: contract.options.address,
     privateKey: deploymentPrivateKey,
-    url
+    url,
+    chainId
   })
+  console.log(232323, result.status)
   if (result.status) {
     assert.strictEqual(Web3Utils.hexToNumber(result.status), 1, 'Transaction Failed')
   } else {

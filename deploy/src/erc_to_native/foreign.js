@@ -88,15 +88,17 @@ async function deployForeign(homeBridgeAddress) {
     throw new Error('ERC20_TOKEN_ADDRESS env var is not defined')
   }
   let nonce = await web3Foreign.eth.getTransactionCount(DEPLOYMENT_ACCOUNT_ADDRESS)
+  let chainId = await web3Foreign.eth.getChainId();
   console.log('========================================')
-  console.log('deploying ForeignBridge')
+  console.log('deploying ForeignBridge, chainId : '. chainId)
   console.log('========================================\n')
 
   console.log('deploying storage for foreign validators')
   const storageValidatorsForeign = await deployContract(EternalStorageProxy, [], {
     from: DEPLOYMENT_ACCOUNT_ADDRESS,
     network: 'foreign',
-    nonce
+    nonce,
+    chainId
   })
   nonce++
   console.log('[Foreign] BridgeValidators Storage: ', storageValidatorsForeign.options.address)
@@ -105,7 +107,8 @@ async function deployForeign(homeBridgeAddress) {
   const bridgeValidatorsForeign = await deployContract(BridgeValidators, [], {
     from: DEPLOYMENT_ACCOUNT_ADDRESS,
     network: 'foreign',
-    nonce
+    nonce,
+    chainId
   })
   nonce++
   console.log('[Foreign] BridgeValidators Implementation: ', bridgeValidatorsForeign.options.address)
@@ -147,6 +150,7 @@ async function deployForeign(homeBridgeAddress) {
   const foreignBridgeStorage = await deployContract(EternalStorageProxy, [], {
     from: DEPLOYMENT_ACCOUNT_ADDRESS,
     network: 'foreign',
+    chainId,
     nonce
   })
   nonce++
@@ -156,6 +160,7 @@ async function deployForeign(homeBridgeAddress) {
   const foreignBridgeImplementation = await deployContract(ForeignBridge, [], {
     from: DEPLOYMENT_ACCOUNT_ADDRESS,
     network: 'foreign',
+    chainId,
     nonce
   })
   nonce++
